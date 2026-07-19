@@ -107,7 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
         List<Transaction> loaded =
             decoded.map((item) => Transaction.fromJson(item)).toList();
 
-        // Sort chronologically ascending to calculate running balance correctly
         loaded.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
         _recalculateRunningBalances(loaded);
@@ -119,7 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      // If error occurs, fallback to clean state
       setState(() {
         _transactions = [];
         _balance = 0.0;
@@ -162,7 +160,28 @@ class _HomeScreenState extends State<HomeScreen> {
       timestamp: DateTime.now(),
     );
 
-    List<Transaction> updated = List.from(_transactions)..add(newTx);
+    List<Transaction> updated = [..._transactions, newTx];
+    updated.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    _recalculateRunningBalances(updated);
+    await _saveTransactions();
+  }
+
+  Future<void> _editTransaction(
+      String id, double amount, bool isCredit, String note) async {
+    List<Transaction> updated = _transactions.map((tx) {
+      if (tx.id == id) {
+        return Transaction(
+          id: tx.id,
+          amount: amount,
+          isCredit: isCredit,
+          note: note.trim().isEmpty ? 'Untitled' : note.trim(),
+          timestamp: tx.timestamp,
+        );
+      }
+      return tx;
+    }).toList();
+
     updated.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     _recalculateRunningBalances(updated);
@@ -240,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                   decoration: const InputDecoration(
                     labelText: 'AMOUNT',
-                    prefixText: '\$ ',
+                    prefixText: '₹ ',
                     prefixStyle: TextStyle(
                       color: Colors.white,
                       fontFamily: 'monospace',
@@ -307,6 +326,215 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showEditTransactionSheet(Transaction tx) {
+    final amountController =
+        TextEditingController(text: tx.amount.toStringAsFixed(2));
+    final noteController =
+        TextEditingController(text: tx.note == 'Untitled' ? '' : tx.note);
+    bool isCredit = tx.isCredit;
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 16,
+                right: 16,
+                top: 16,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'EDIT TRANSACTION',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                isCredit = true;
+                              });
+                            },
+                            child: Container(
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isCredit
+                                    ? const Color(0xFF00FF66)
+                                    : Colors.black,
+                                border: Border.all(
+                                  color: isCredit
+                                      ? const Color(0xFF00FF66)
+                                      : const Color(0xFF808080),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Text(
+                                'CREDIT (IN)',
+                                style: TextStyle(
+                                  color: isCredit
+                                      ? Colors.black
+                                      : const Color(0xFF808080),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                isCredit = false;
+                              });
+                            },
+                            child: Container(
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !isCredit
+                                    ? const Color(0xFFFF1E1E)
+                                    : Colors.black,
+                                border: Border.all(
+                                  color: !isCredit
+                                      ? const Color(0xFFFF1E1E)
+                                      : const Color(0xFF808080),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Text(
+                                'DEBIT (OUT)',
+                                style: TextStyle(
+                                  color: !isCredit
+                                      ? Colors.white
+                                      : const Color(0xFF808080),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: amountController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}')),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'AMOUNT',
+                        prefixText: '₹ ',
+                        prefixStyle: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'AMOUNT REQUIRED';
+                        }
+                        final parsed = double.tryParse(value);
+                        if (parsed == null || parsed <= 0) {
+                          return 'ENTER A VALID AMOUNT';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: noteController,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'NOTE / LABEL (OPTIONAL)',
+                        hintText: 'e.g. Salary, Groceries',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    GestureDetector(
+                      onTap: () {
+                        if (formKey.currentState!.validate()) {
+                          final amount = double.parse(amountController.text);
+                          final note = noteController.text.trim();
+                          _editTransaction(tx.id, amount, isCredit, note);
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        decoration: BoxDecoration(
+                          color: isCredit
+                              ? const Color(0xFF00FF66)
+                              : const Color(0xFFFF1E1E),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          'SAVE CHANGES',
+                          style: TextStyle(
+                            color: isCredit ? Colors.black : Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            letterSpacing: 1.5,
+                      ),
+                    ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDeleteConfirmationSheet(Transaction tx) {
     showModalBottomSheet(
       context: context,
@@ -314,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       builder: (context) {
         final formattedAmount =
-            '${tx.isCredit ? '+' : '-'}\$${tx.amount.toStringAsFixed(2)}';
+            '${tx.isCredit ? '+' : '-'}₹${tx.amount.toStringAsFixed(2)}';
         return Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
@@ -423,6 +651,97 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildTransactionRow(Transaction tx) {
+    final formattedTime = DateFormat('HH:mm').format(tx.timestamp);
+    final formattedAmount =
+        '${tx.isCredit ? '+' : '-'}₹${tx.amount.toStringAsFixed(2)}';
+    final formattedBalance = 'BAL: ₹${tx.balanceAfter.toStringAsFixed(2)}';
+
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: tx.isCredit
+                    ? const Color(0xFF00FF66)
+                    : const Color(0xFFFF1E1E),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              tx.isCredit ? 'CR' : 'DR',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                color: tx.isCredit
+                    ? const Color(0xFF00FF66)
+                    : const Color(0xFFFF1E1E),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tx.note,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  formattedTime,
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                formattedAmount,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  color: tx.isCredit
+                      ? const Color(0xFF00FF66)
+                      : const Color(0xFFFF1E1E),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                formattedBalance,
+                style: const TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -442,15 +761,66 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final displayedTransactions = _transactions.reversed.toList();
+    final List<Widget> listItems = [];
+    String? currentGroupDate;
+
+    for (var i = 0; i < displayedTransactions.length; i++) {
+      final tx = displayedTransactions[i];
+      final dateStr = DateFormat('yyyy-MM-dd').format(tx.timestamp);
+      final headerText =
+          DateFormat('MMMM dd, yyyy').format(tx.timestamp).toUpperCase();
+
+      if (currentGroupDate != dateStr) {
+        currentGroupDate = dateStr;
+        listItems.add(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFF111111),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFF808080), width: 1),
+                top: BorderSide(color: Color(0xFF808080), width: 1),
+              ),
+            ),
+            child: Text(
+              '// $headerText',
+              style: const TextStyle(
+                color: Color(0xFFAAAAAA),
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+        );
+      }
+
+      listItems.add(
+        SwipeableLogEntry(
+          key: ValueKey(tx.id),
+          transaction: tx,
+          onEdit: () => _showEditTransactionSheet(tx),
+          onDelete: () => _showDeleteConfirmationSheet(tx),
+          child: Column(
+            children: [
+              _buildTransactionRow(tx),
+              const Divider(),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
                   Image.asset(
@@ -459,7 +829,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 24,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
-                      // Fallback if asset isn't loaded yet
                       return const Icon(Icons.account_balance_wallet,
                           color: Colors.white, size: 24);
                     },
@@ -478,8 +847,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const Divider(),
-
-            // Balance Section
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
               decoration: const BoxDecoration(
@@ -491,7 +858,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'TOTAL LEDGER BALANCE',
+                    'TOTAL BALANCE',
                     style: TextStyle(
                       color: Color(0xFF888888),
                       fontSize: 11,
@@ -504,7 +871,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      '${_balance >= 0 ? '+' : ''}\$${_balance.toStringAsFixed(2)}',
+                      '${_balance >= 0 ? '+' : ''}₹${_balance.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 48,
@@ -518,8 +885,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
-            // Action Row
             Row(
               children: [
                 Expanded(
@@ -569,13 +934,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-
-            // Thick Divider
             Container(height: 4, color: const Color(0xFF808080)),
-
-            // Log List
             Expanded(
-              child: displayedTransactions.isEmpty
+              child: listItems.isEmpty
                   ? const Center(
                       child: Text(
                         '// NO TRANSACTIONS YET',
@@ -587,114 +948,174 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     )
-                  : ListView.separated(
+                  : ListView.builder(
                       padding: EdgeInsets.zero,
-                      itemCount: displayedTransactions.length,
-                      separatorBuilder: (context, index) => const Divider(),
+                      itemCount: listItems.length,
                       itemBuilder: (context, index) {
-                        final tx = displayedTransactions[index];
-                        final formattedDate =
-                            DateFormat('yyyy-MM-dd HH:mm').format(tx.timestamp);
-                        final formattedAmount =
-                            '${tx.isCredit ? '+' : '-'}\$${tx.amount.toStringAsFixed(2)}';
-                        final formattedBalance =
-                            'BAL: \$${tx.balanceAfter.toStringAsFixed(2)}';
-
-                        return GestureDetector(
-                          onLongPress: () => _showDeleteConfirmationSheet(tx),
-                          child: Container(
-                            color: Colors.transparent, // Fix hit-testing
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 18),
-                            child: Row(
-                              children: [
-                                // CR/DR indicator block
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: tx.isCredit
-                                          ? const Color(0xFF00FF66)
-                                          : const Color(0xFFFF1E1E),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    tx.isCredit ? 'CR' : 'DR',
-                                    style: TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
-                                      color: tx.isCredit
-                                          ? const Color(0xFF00FF66)
-                                          : const Color(0xFFFF1E1E),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                // Note & Date
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        tx.note,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        formattedDate,
-                                        style: const TextStyle(
-                                          color: Color(0xFF888888),
-                                          fontSize: 11,
-                                          fontFamily: 'monospace',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                // Amount & Balance after
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      formattedAmount,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: tx.isCredit
-                                            ? const Color(0xFF00FF66)
-                                            : const Color(0xFFFF1E1E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      formattedBalance,
-                                      style: const TextStyle(
-                                        color: Color(0xFF888888),
-                                        fontSize: 11,
-                                        fontFamily: 'monospace',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                        return listItems[index];
                       },
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class SwipeableLogEntry extends StatefulWidget {
+  final Transaction transaction;
+  final VoidCallback onDelete;
+  final VoidCallback onEdit;
+  final Widget child;
+
+  const SwipeableLogEntry({
+    super.key,
+    required this.transaction,
+    required this.onDelete,
+    required this.onEdit,
+    required this.child,
+  });
+
+  @override
+  State<SwipeableLogEntry> createState() => _SwipeableLogEntryState();
+}
+
+class _SwipeableLogEntryState extends State<SwipeableLogEntry>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  double _dragOffset = 0.0;
+  double _animStart = 0.0;
+  double _animEnd = 0.0;
+  static const double _actionsWidth = 210.0; // 3 buttons * 70px
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _animation = _controller.drive(CurveTween(curve: Curves.easeOut));
+    _controller.addListener(() {
+      setState(() {
+        _dragOffset = _animStart + (_animEnd - _animStart) * _animation.value;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _animateToOffset(double target) {
+    _animStart = _dragOffset;
+    _animEnd = target;
+    _controller.reset();
+    _controller.forward();
+  }
+
+  void _close() {
+    _animateToOffset(0.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) {
+        setState(() {
+          _dragOffset += details.primaryDelta!;
+          if (_dragOffset < -_actionsWidth) _dragOffset = -_actionsWidth;
+          if (_dragOffset > _actionsWidth) _dragOffset = _actionsWidth;
+        });
+      },
+      onHorizontalDragEnd: (details) {
+        if (_dragOffset < -_actionsWidth / 2) {
+          _animateToOffset(-_actionsWidth);
+        } else if (_dragOffset > _actionsWidth / 2) {
+          _animateToOffset(_actionsWidth);
+        } else {
+          _animateToOffset(0.0);
+        }
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              color: const Color(0xFF111111),
+              child: Row(
+                children: [
+                  if (_dragOffset > 0) ..._buildActionButtons(),
+                  const Spacer(),
+                  if (_dragOffset < 0) ..._buildActionButtons(),
+                ],
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: Container(
+              color: Colors.black,
+              child: widget.child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildActionButtons() {
+    return [
+      _buildAction(
+        label: 'EDIT',
+        color: const Color(0xFF00FFFF), // Saturated Cyan
+        textColor: Colors.black,
+        onTap: () {
+          _close();
+          widget.onEdit();
+        },
+      ),
+      _buildAction(
+        label: 'DELETE',
+        color: const Color(0xFFFF1E1E), // Saturated Red
+        textColor: Colors.white,
+        onTap: () {
+          _close();
+          widget.onDelete();
+        },
+      ),
+      _buildAction(
+        label: 'CLOSE',
+        color: const Color(0xFF808080), // Mid Grey
+        textColor: Colors.white,
+        onTap: _close,
+      ),
+    ];
+  }
+
+  Widget _buildAction({
+    required String label,
+    required Color color,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 70,
+        alignment: Alignment.center,
+        color: color,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w900,
+            fontSize: 11,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
     );
