@@ -2227,14 +2227,12 @@ class _SwipeableLogEntryState extends State<SwipeableLogEntry>
         setState(() {
           _dragOffset += details.primaryDelta!;
           if (_dragOffset < -_actionsWidth) _dragOffset = -_actionsWidth;
-          if (_dragOffset > _actionsWidth) _dragOffset = _actionsWidth;
+          if (_dragOffset > 0) _dragOffset = 0; // Disable swiping right
         });
       },
       onHorizontalDragEnd: (details) {
         if (_dragOffset < -_actionsWidth / 2) {
           _animateToOffset(-_actionsWidth);
-        } else if (_dragOffset > _actionsWidth / 2) {
-          _animateToOffset(_actionsWidth);
         } else {
           _animateToOffset(0.0);
         }
@@ -2246,7 +2244,6 @@ class _SwipeableLogEntryState extends State<SwipeableLogEntry>
               color: const Color(0xFF111111),
               child: Row(
                 children: [
-                  if (_dragOffset > 0) ..._buildActionButtons(),
                   const Spacer(),
                   if (_dragOffset < 0) ..._buildActionButtons(),
                 ],
