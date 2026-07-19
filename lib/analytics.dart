@@ -7,8 +7,13 @@ enum TimelineFilter { thisMonth, thisYear, allTime, custom }
 
 class AnalyticsScreen extends StatefulWidget {
   final List<Transaction> transactions;
+  final VoidCallback onReset;
 
-  const AnalyticsScreen({super.key, required this.transactions});
+  const AnalyticsScreen({
+    super.key,
+    required this.transactions,
+    required this.onReset,
+  });
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -19,6 +24,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   late DateTime _startDate;
   late DateTime _endDate;
   int _touchedPieIndex = -1;
+  int _resetClickCount = 0;
+  DateTime? _lastResetClickTime;
 
   @override
   void initState() {
@@ -102,6 +109,193 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }).toList();
   }
 
+  void _showResetAppDialog(BuildContext context) {
+    final confirmationController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isConfirmEnabled =
+                confirmationController.text.trim().toLowerCase() == 'yes delete';
+            return AlertDialog(
+              backgroundColor: Colors.black,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+                side: BorderSide(color: Color(0xFFFF1E1E), width: 2),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_outlined, color: Color(0xFFFF1E1E), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'RESET APP DATA',
+                    style: TextStyle(
+                      color: Color(0xFFFF1E1E),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Are you sure to completely delete all of your finance logs?',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: confirmationController,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'TYPE "yes delete" TO CONFIRM',
+                        labelStyle: TextStyle(
+                          color: Color(0xFFAAAAAA),
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                        hintText: 'yes delete',
+                      ),
+                      onChanged: (val) {
+                        setDialogState(() {});
+                      },
+                      validator: (value) {
+                        if (value == null || value.trim().toLowerCase() != 'yes delete') {
+                          return 'CONFIRMATION TEXT MISMATCH';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF808080), width: 1.5),
+                        ),
+                        child: const Text(
+                          'CANCEL',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: isConfirmEnabled
+                          ? () {
+                              final navigator = Navigator.of(context);
+                              final scaffoldMessenger = ScaffoldMessenger.of(context);
+                              widget.onReset();
+                              navigator.pop(); // Pop the dialog
+                              navigator.pop(); // Pop the analytics screen
+                              scaffoldMessenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'ALL FINANCE DATA ERASED',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  backgroundColor: Color(0xFFFF1E1E),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isConfirmEnabled ? const Color(0xFFFF1E1E) : Colors.black,
+                          border: Border.all(
+                            color: isConfirmEnabled ? const Color(0xFFFF1E1E) : const Color(0xFF333333),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          'RESET',
+                          style: TextStyle(
+                            color: isConfirmEnabled ? Colors.white : const Color(0xFF808080),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _handleResetTap() {
+    final now = DateTime.now();
+    if (_lastResetClickTime == null || now.difference(_lastResetClickTime!) > const Duration(seconds: 2)) {
+      _resetClickCount = 1;
+    } else {
+      _resetClickCount++;
+    }
+    _lastResetClickTime = now;
+
+    if (_resetClickCount >= 5) {
+      _resetClickCount = 0;
+      _showResetAppDialog(context);
+    } else {
+      final remaining = 5 - _resetClickCount;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'YOU ARE NOW $remaining CLICK${remaining > 1 ? 'S' : ''} AWAY FROM RESETTING.',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          backgroundColor: Colors.black,
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.zero,
+            side: BorderSide(color: Color(0xFFFF1E1E), width: 1.5),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredTransactions = _getFilteredTransactions();
@@ -157,8 +351,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: () {
+                      _handleResetTap();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        border: Border.all(color: const Color(0xFFFF1E1E), width: 1.5),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_outlined,
+                              color: Color(0xFFFF1E1E), size: 13),
+                          SizedBox(width: 4),
+                          Text(
+                            'RESET',
+                            style: TextStyle(
+                              color: Color(0xFFFF1E1E),
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   const Text(
-                    '// ANALYTICS',
+                    'ANALYTICS',
                     style: TextStyle(
                       color: Colors.white,
                       fontFamily: 'monospace',

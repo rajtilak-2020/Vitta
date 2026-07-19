@@ -332,159 +332,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showResetAppDialog(BuildContext context) {
-    final confirmationController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.8),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final isConfirmEnabled =
-                confirmationController.text.trim().toLowerCase() == 'yes delete';
-            return AlertDialog(
-              backgroundColor: Colors.black,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.zero,
-                side: BorderSide(color: Color(0xFFFF1E1E), width: 2),
-              ),
-              title: const Row(
-                children: [
-                  Icon(Icons.warning_amber_outlined, color: Color(0xFFFF1E1E), size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'RESET APP DATA',
-                    style: TextStyle(
-                      color: Color(0xFFFF1E1E),
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Are you sure to completely delete all of your finance logs?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'monospace',
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: confirmationController,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'TYPE "yes delete" TO CONFIRM',
-                        labelStyle: TextStyle(
-                          color: Color(0xFFAAAAAA),
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                        ),
-                        hintText: 'yes delete',
-                      ),
-                      onChanged: (val) {
-                        setDialogState(() {});
-                      },
-                      validator: (value) {
-                        if (value == null || value.trim().toLowerCase() != 'yes delete') {
-                          return 'CONFIRMATION TEXT MISMATCH';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFF808080), width: 1.5),
-                        ),
-                        child: const Text(
-                          'CANCEL',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: isConfirmEnabled
-                          ? () async {
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.clear();
-                              if (!context.mounted) return;
-                              setState(() {
-                                _transactions = [];
-                                _balance = 0.0;
-                                _tags = ['FOOD', 'SHOPPING', 'OTHERS'];
-                              });
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'ALL FINANCE DATA ERASED',
-                                    style: TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  backgroundColor: Color(0xFFFF1E1E),
-                                ),
-                              );
-                            }
-                          : null,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isConfirmEnabled ? const Color(0xFFFF1E1E) : Colors.black,
-                          border: Border.all(
-                            color: isConfirmEnabled ? const Color(0xFFFF1E1E) : const Color(0xFF333333),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Text(
-                          'RESET',
-                          style: TextStyle(
-                            color: isConfirmEnabled ? Colors.white : const Color(0xFF808080),
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   void _showAddTransactionSheet({required bool isCredit}) {
     final amountController = TextEditingController();
     final noteController = TextEditingController();
@@ -1358,26 +1205,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () {
-                      _showResetAppDialog(context);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        border: Border.all(color: const Color(0xFFFF1E1E), width: 1.5),
-                      ),
-                      child: const Icon(Icons.warning_amber_outlined,
-                          color: Color(0xFFFF1E1E), size: 16),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              AnalyticsScreen(transactions: _transactions),
+                          builder: (context) => AnalyticsScreen(
+                            transactions: _transactions,
+                            onReset: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.clear();
+                              setState(() {
+                                _transactions = [];
+                                _balance = 0.0;
+                                _tags = ['FOOD', 'SHOPPING', 'OTHERS'];
+                              });
+                            },
+                          ),
                         ),
                       );
                     },
