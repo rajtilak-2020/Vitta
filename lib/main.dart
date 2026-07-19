@@ -194,126 +194,129 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Container(
       color: Colors.black,
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Image.asset(
-            'logo/vitta.png',
-            height: 48,
-            width: 48,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.account_balance_wallet,
-                  color: Colors.white, size: 48);
-            },
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'VITTA',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 4,
-              fontFamily: 'monospace',
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              'logo/vitta.png',
+              height: 48,
+              width: 48,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.account_balance_wallet,
+                    color: Colors.white, size: 48);
+              },
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _savedPin != null ? 'ENTER PIN TO UNLOCK' : 'APP LOCKED',
-            style: const TextStyle(
-              color: Color(0xFF888888),
-              fontSize: 12,
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const Spacer(),
-          if (showPinPad) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(4, (index) {
-                final hasChar = _enteredPin.length > index;
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: hasChar ? Colors.white : Colors.transparent,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 48),
-            Expanded(
-              flex: 4,
-              child: Table(
-                children: [
-                  TableRow(
-                    children: [
-                      _buildKeypadButton('1'),
-                      _buildKeypadButton('2'),
-                      _buildKeypadButton('3'),
-                    ],
-                  ),
-                  TableRow(
-                    children: [
-                      _buildKeypadButton('4'),
-                      _buildKeypadButton('5'),
-                      _buildKeypadButton('6'),
-                    ],
-                  ),
-                  TableRow(
-                    children: [
-                      _buildKeypadButton('7'),
-                      _buildKeypadButton('8'),
-                      _buildKeypadButton('9'),
-                    ],
-                  ),
-                  TableRow(
-                    children: [
-                      _buildKeypadButton('CLEAR'),
-                      _buildKeypadButton('0'),
-                      _buildKeypadButton('BACK'),
-                    ],
-                  ),
-                ],
+            const SizedBox(height: 16),
+            const Text(
+              'VITTA',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+                fontFamily: 'monospace',
               ),
             ),
-          ] else ...[
-            GestureDetector(
-              onTap: _authenticateDevice,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
+            const SizedBox(height: 8),
+            Text(
+              _savedPin != null ? 'ENTER PIN TO UNLOCK' : 'APP LOCKED',
+              style: const TextStyle(
+                color: Color(0xFF888888),
+                fontSize: 12,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const Spacer(),
+            if (showPinPad) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(4, (index) {
+                  final hasChar = _enteredPin.length > index;
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 12),
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: hasChar ? Colors.white : Colors.transparent,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 48),
+              Expanded(
+                flex: 4,
+                child: Table(
                   children: [
-                    Icon(Icons.fingerprint, color: Colors.white, size: 24),
-                    SizedBox(width: 12),
-                    Text(
-                      'TAP TO UNLOCK',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        letterSpacing: 1.5,
-                      ),
+                    TableRow(
+                      children: [
+                        _buildKeypadButton('1'),
+                        _buildKeypadButton('2'),
+                        _buildKeypadButton('3'),
+                      ],
+                    ),
+                    TableRow(
+                      children: [
+                        _buildKeypadButton('4'),
+                        _buildKeypadButton('5'),
+                        _buildKeypadButton('6'),
+                      ],
+                    ),
+                    TableRow(
+                      children: [
+                        _buildKeypadButton('7'),
+                        _buildKeypadButton('8'),
+                        _buildKeypadButton('9'),
+                      ],
+                    ),
+                    TableRow(
+                      children: [
+                        _buildKeypadButton('CLEAR'),
+                        _buildKeypadButton('0'),
+                        _buildKeypadButton('BACK'),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
-            const Spacer(),
+            ] else ...[
+              GestureDetector(
+                onTap: _authenticateDevice,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.fingerprint, color: Colors.white, size: 24),
+                      SizedBox(width: 12),
+                      Text(
+                        'TAP TO UNLOCK',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
