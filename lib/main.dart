@@ -988,7 +988,7 @@ class _SwipeableLogEntryState extends State<SwipeableLogEntry>
   double _dragOffset = 0.0;
   double _animStart = 0.0;
   double _animEnd = 0.0;
-  static const double _actionsWidth = 210.0; // 3 buttons * 70px
+  static const double _actionsWidth = 140.0; // 2 buttons * 70px
 
   @override
   void initState() {
@@ -1071,8 +1071,8 @@ class _SwipeableLogEntryState extends State<SwipeableLogEntry>
     return [
       _buildAction(
         label: 'EDIT',
-        color: const Color(0xFF00FFFF), // Saturated Cyan
-        textColor: Colors.black,
+        color: const Color.fromARGB(255, 33, 33, 33), // Saturated Cyan
+        textColor: const Color.fromARGB(255, 255, 255, 255),
         onTap: () {
           _close();
           widget.onEdit();
@@ -1087,12 +1087,12 @@ class _SwipeableLogEntryState extends State<SwipeableLogEntry>
           widget.onDelete();
         },
       ),
-      _buildAction(
-        label: 'CLOSE',
-        color: const Color(0xFF808080), // Mid Grey
-        textColor: Colors.white,
-        onTap: _close,
-      ),
+      // _buildAction(
+      //   label: 'CLOSE',
+      //   color: const Color(0xFF808080), // Mid Grey
+      //   textColor: Colors.white,
+      //   onTap: _close,
+      // ),
     ];
   }
 
