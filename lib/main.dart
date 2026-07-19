@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:local_auth/local_auth.dart';
 import 'models.dart';
 import 'analytics.dart';
 import 'calculator.dart';
@@ -89,16 +90,738 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Transaction> _transactions = [];
   double _balance = 0.0;
   bool _isLoading = true;
   List<String> _tags = ['FOOD', 'SHOPPING', 'OTHERS'];
 
+  // Security variables
+  bool _isLocalAuthEnabled = false;
+  String? _savedPin;
+  bool _isLocked = false;
+  final LocalAuthentication _auth = LocalAuthentication();
+  String _enteredPin = '';
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadSecuritySettings().then((_) {
+      if (_isLocalAuthEnabled) {
+        setState(() {
+          _isLocked = true;
+        });
+        _authenticateDevice();
+      }
+    });
     _loadTags().then((_) => _loadTransactions());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (_isLocalAuthEnabled) {
+        setState(() {
+          _isLocked = true;
+          _enteredPin = '';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSecuritySettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _isLocalAuthEnabled = prefs.getBool('local_auth_enabled') ?? false;
+        _savedPin = prefs.getString('app_pin');
+      });
+    } catch (e) {
+      // Ignored
+    }
+  }
+
+  Future<void> _saveSecuritySettings(bool enabled, String? pin) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('local_auth_enabled', enabled);
+      if (pin != null) {
+        await prefs.setString('app_pin', pin);
+      } else {
+        await prefs.remove('app_pin');
+      }
+      setState(() {
+        _isLocalAuthEnabled = enabled;
+        _savedPin = pin;
+      });
+    } catch (e) {
+      // Ignored
+    }
+  }
+
+  Future<void> _authenticateDevice() async {
+    try {
+      final bool canCheck = await _auth.canCheckBiometrics;
+      final bool isSupported = await _auth.isDeviceSupported();
+      if (_savedPin == null && (canCheck || isSupported)) {
+        final bool authenticated = await _auth.authenticate(
+          localizedReason: 'AUTHENTICATE TO UNLOCK VITTA',
+          options: const AuthenticationOptions(
+            biometricOnly: false,
+            stickyAuth: true,
+          ),
+        );
+        if (authenticated) {
+          setState(() {
+            _isLocked = false;
+          });
+        }
+      }
+    } catch (e) {
+      // Ignored
+    }
+  }
+
+  Widget _buildLockScreen() {
+    final showPinPad = _savedPin != null;
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Image.asset(
+            'logo/vitta.png',
+            height: 48,
+            width: 48,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.account_balance_wallet,
+                  color: Colors.white, size: 48);
+            },
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'VITTA',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 4,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _savedPin != null ? 'ENTER PIN TO UNLOCK' : 'APP LOCKED',
+            style: const TextStyle(
+              color: Color(0xFF888888),
+              fontSize: 12,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const Spacer(),
+          if (showPinPad) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(4, (index) {
+                final hasChar = _enteredPin.length > index;
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: hasChar ? Colors.white : Colors.transparent,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 48),
+            Expanded(
+              flex: 4,
+              child: Table(
+                children: [
+                  TableRow(
+                    children: [
+                      _buildKeypadButton('1'),
+                      _buildKeypadButton('2'),
+                      _buildKeypadButton('3'),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      _buildKeypadButton('4'),
+                      _buildKeypadButton('5'),
+                      _buildKeypadButton('6'),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      _buildKeypadButton('7'),
+                      _buildKeypadButton('8'),
+                      _buildKeypadButton('9'),
+                    ],
+                  ),
+                  TableRow(
+                    children: [
+                      _buildKeypadButton('CLEAR'),
+                      _buildKeypadButton('0'),
+                      _buildKeypadButton('BACK'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            GestureDetector(
+              onTap: _authenticateDevice,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.fingerprint, color: Colors.white, size: 24),
+                    SizedBox(width: 12),
+                    Text(
+                      'TAP TO UNLOCK',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeypadButton(String val) {
+    return TableCell(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (val == 'CLEAR') {
+              _enteredPin = '';
+            } else if (val == 'BACK') {
+              if (_enteredPin.isNotEmpty) {
+                _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+              }
+            } else {
+              if (_enteredPin.length < 4) {
+                _enteredPin += val;
+                if (_enteredPin.length == 4) {
+                  if (_enteredPin == _savedPin) {
+                    _isLocked = false;
+                    _enteredPin = '';
+                  } else {
+                    _enteredPin = '';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'INCORRECT PIN',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: Color(0xFFFF1E1E),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                }
+              }
+            }
+          });
+        },
+        child: Container(
+          height: 60,
+          alignment: Alignment.center,
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFF808080), width: 1.5),
+          ),
+          child: Text(
+            val,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'monospace',
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSecuritySetupDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.black,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+                side: BorderSide(color: Colors.white, width: 2),
+              ),
+              title: const Text(
+                'SECURITY SETTINGS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _isLocalAuthEnabled
+                        ? 'SECURITY LOCK IS CURRENTLY ENABLED.'
+                        : 'SECURE YOUR VITTA LEDGER WITH A DEVICE LOCK OR PIN CODE.',
+                    style: const TextStyle(
+                      color: Color(0xFFAAAAAA),
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (_isLocalAuthEnabled) ...[
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showDisableVerificationDialog();
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF1E1E),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: const Text(
+                          'DISABLE SECURITY LOCK',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    GestureDetector(
+                      onTap: () async {
+                        Navigator.pop(context);
+                        _setupDeviceBiometrics();
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: const Text(
+                          'USE DEVICE BIOMETRICS / LOCK',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showSetupPinDialog();
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: const Text(
+                          'SET 4-DIGIT PIN CODE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF808080), width: 1.5),
+                    ),
+                    child: const Text(
+                      'CLOSE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _setupDeviceBiometrics() async {
+    try {
+      final bool canCheck = await _auth.canCheckBiometrics;
+      final bool isSupported = await _auth.isDeviceSupported();
+      if (!canCheck && !isSupported) {
+        _showErrorSnackBar('BIOMETRICS NOT SUPPORTED ON THIS DEVICE');
+        return;
+      }
+      final bool authenticated = await _auth.authenticate(
+        localizedReason: 'CONFIRM IDENTITY TO ENABLE SECURITY',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+        ),
+      );
+      if (authenticated) {
+        await _saveSecuritySettings(true, null);
+        _showSuccessSnackBar('DEVICE LOCK ENABLED SUCCESSFULLY');
+      } else {
+        _showErrorSnackBar('AUTHENTICATION FAILED');
+      }
+    } catch (e) {
+      _showErrorSnackBar('ERROR SETTING UP DEVICE LOCK: $e');
+    }
+  }
+
+  void _showSetupPinDialog() {
+    final pinController = TextEditingController();
+    final confirmController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.black,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.zero,
+            side: BorderSide(color: Colors.white, width: 2),
+          ),
+          title: const Text(
+            'SETUP 4-DIGIT PIN',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              letterSpacing: 1.5,
+            ),
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: pinController,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'ENTER PIN',
+                    counterText: '',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.length != 4) {
+                      return 'PIN MUST BE 4 DIGITS';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: confirmController,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'CONFIRM PIN',
+                    counterText: '',
+                  ),
+                  validator: (value) {
+                    if (value != pinController.text) {
+                      return 'PIN DO NOT MATCH';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF808080), width: 1.5),
+                    ),
+                    child: const Text(
+                      'CANCEL',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () async {
+                    if (formKey.currentState!.validate()) {
+                      final newPin = pinController.text;
+                      await _saveSecuritySettings(true, newPin);
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      _showSuccessSnackBar('PIN SECURITY ENABLED SUCCESSFULLY');
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: const Text(
+                      'SAVE',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDisableVerificationDialog() {
+    if (_savedPin != null) {
+      final pinController = TextEditingController();
+      final formKey = GlobalKey<FormState>();
+
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.8),
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: Colors.black,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+              side: BorderSide(color: Color(0xFFFF1E1E), width: 2),
+            ),
+            title: const Text(
+              'VERIFY PIN TO DISABLE',
+              style: TextStyle(
+                color: Color(0xFFFF1E1E),
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                letterSpacing: 1.5,
+              ),
+            ),
+            content: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: pinController,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'ENTER CURRENT PIN',
+                  counterText: '',
+                ),
+                validator: (value) {
+                  if (value != _savedPin) {
+                    return 'INCORRECT PIN';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFF808080), width: 1.5),
+                      ),
+                      child: const Text(
+                        'CANCEL',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () async {
+                      if (formKey.currentState!.validate()) {
+                        await _saveSecuritySettings(false, null);
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        _showSuccessSnackBar('SECURITY LOCK DISABLED');
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF1E1E),
+                        border: Border.all(color: const Color(0xFFFF1E1E), width: 1.5),
+                      ),
+                      child: const Text(
+                        'DISABLE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      _disableBiometrics();
+    }
+  }
+
+  Future<void> _disableBiometrics() async {
+    try {
+      final bool authenticated = await _auth.authenticate(
+        localizedReason: 'CONFIRM IDENTITY TO DISABLE SECURITY',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+        ),
+      );
+      if (authenticated) {
+        await _saveSecuritySettings(false, null);
+        _showSuccessSnackBar('SECURITY LOCK DISABLED');
+      } else {
+        _showErrorSnackBar('AUTHENTICATION FAILED');
+      }
+    } catch (e) {
+      _showErrorSnackBar('ERROR: $e');
+    }
+  }
+
+  void _showErrorSnackBar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color(0xFFFF1E1E),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color(0xFF00FF66),
+      ),
+    );
   }
 
   Future<void> _loadTags() async {
@@ -1175,9 +1898,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        child: _isLocked
+            ? _buildLockScreen()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -1194,16 +1919,45 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'VITTA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                  GestureDetector(
+                    onTap: () {
+                      if (_isLocalAuthEnabled) {
+                        setState(() {
+                          _isLocked = true;
+                          _enteredPin = '';
+                        });
+                        _authenticateDevice();
+                      }
+                    },
+                    child: const Text(
+                      'VITTA',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
                   const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      _showSecuritySetupDialog();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Icon(
+                        _isLocalAuthEnabled ? Icons.lock : Icons.lock_open,
+                        color: _isLocalAuthEnabled ? const Color(0xFF00FF66) : Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -1367,8 +2121,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
             ),
-          ],
-        ),
+                ],
+              ),
       ),
     );
   }
