@@ -652,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTransactionRow(Transaction tx) {
-    final formattedTime = DateFormat('HH:mm').format(tx.timestamp);
+    final formattedTime = DateFormat('hh:mm a').format(tx.timestamp);
     final formattedAmount =
         '${tx.isCredit ? '+' : '-'}₹${tx.amount.toStringAsFixed(2)}';
     final formattedBalance = 'BAL: ₹${tx.balanceAfter.toStringAsFixed(2)}';
@@ -768,7 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final tx = displayedTransactions[i];
       final dateStr = DateFormat('yyyy-MM-dd').format(tx.timestamp);
       final headerText =
-          DateFormat('MMMM dd, yyyy').format(tx.timestamp).toUpperCase();
+          DateFormat('EEE, dd-MM-yyyy').format(tx.timestamp).toUpperCase();
 
       if (currentGroupDate != dateStr) {
         currentGroupDate = dateStr;
