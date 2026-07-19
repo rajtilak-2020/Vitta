@@ -1,12 +1,29 @@
 Copyright (c) 2026 K Rajtilak. All rights reserved.
 
-Proprietary and Confidential - No Copying / Unauthorized Use
+Proprietary License - Contributions Allowed, No Redistribution or Use Without Permission
 
-No part of this software, project, or associated documentation may be copied, 
-reproduced, modified, distributed, or transmitted in any form or by any means, 
-including photocopying, recording, or other electronic or mechanical methods, 
-without the prior written permission of the copyright holder.
+1. Purpose and Permitted Contributions:
+This software, source code, and associated documentation are proprietary. You are 
+permitted to view the source code and make contributions (such as bug fixes, feature 
+enhancements, and documentation updates) back to the official repository at 
+https://github.com/Krajtilak25/Vitta.git via forks and pull requests.
 
-Any unauthorized copying, modification, distribution, or commercial use of this 
-software constitutes a direct infringement of copyright law and is subject to 
-legal action, including civil and criminal penalties.
+2. Restrictions:
+- You may not copy, clone, reproduce, modify, or build derivative versions of this 
+  software for personal use, commercial projects, or redistribution under a different 
+  project name, without the prior written permission of the copyright owner.
+- You may not distribute, host, or publish compiled versions of this software (such 
+  as Android APKs or Web build directories) for public or commercial access.
+- Any use of the source code or binary outputs outside of contributing directly to 
+  the official project is strictly prohibited.
+
+3. Intellectual Property Rights:
+By submitting any contribution (including pull requests or code submissions) to the 
+official repository, you grant the copyright holder a perpetual, irrevocable, 
+unrestricted, royalty-free license to use, modify, distribute, and compile your 
+contribution as part of the project.
+
+4. Enforcement:
+Any unauthorized copying, modification, distribution, or use of this software 
+outside of the permitted contribution workflow constitutes an infringement of 
+copyright law and is subject to legal action.
