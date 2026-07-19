@@ -600,7 +600,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           graphPoints[key] = graphPoints[key]! + tx.amount;
         }
       }
-    } else {
+    } else if (daysInRange <= 365) {
       // Group by Month (monthly spends)
       // Get all months in range
       DateTime cursor = DateTime(_startDate.year, _startDate.month, 1);
@@ -613,6 +613,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
       for (var tx in debits) {
         final key = DateFormat('yyyy-MM').format(tx.timestamp);
+        if (graphPoints.containsKey(key)) {
+          graphPoints[key] = graphPoints[key]! + tx.amount;
+        }
+      }
+    } else {
+      // Group by Year (yearly spends)
+      int startYear = _startDate.year;
+      int endYear = _endDate.year;
+
+      if (_selectedFilter == TimelineFilter.allTime) {
+        if (debits.isNotEmpty) {
+          final years = debits.map((tx) => tx.timestamp.year).toList();
+          years.sort();
+          startYear = years.first;
+          endYear = years.last;
+        } else {
+          startYear = DateTime.now().year;
+          endYear = DateTime.now().year;
+        }
+      }
+
+      for (int year = startYear; year <= endYear; year++) {
+        final key = year.toString();
+        graphPoints[key] = 0.0;
+        orderedKeys.add(key);
+      }
+
+      for (var tx in debits) {
+        final key = tx.timestamp.year.toString();
         if (graphPoints.containsKey(key)) {
           graphPoints[key] = graphPoints[key]! + tx.amount;
         }
@@ -695,9 +724,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           if (daysInRange <= 31) {
                             final parsedDate = DateFormat('yyyy-MM-dd').parse(key);
                             label = DateFormat('dd MMM').format(parsedDate);
-                          } else {
+                          } else if (daysInRange <= 365) {
                             final parsedDate = DateFormat('yyyy-MM').parse(key);
                             label = DateFormat('MMM yy').format(parsedDate);
+                          } else {
+                            label = key;
                           }
                           return BarTooltipItem(
                             '$label\n',
@@ -762,11 +793,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             String text = '';
                             if (daysInRange <= 31) {
                               text = key.substring(8); // Day number
-                            } else {
+                            } else if (daysInRange <= 365) {
                               // Month (e.g. "2026-07" -> "JUL")
                               final monthInt = int.parse(key.substring(5));
                               const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
                               text = months[monthInt - 1];
+                            } else {
+                              text = key; // Year (e.g. "2026")
                             }
                             return Padding(
                               padding: const EdgeInsets.only(top: 6.0),
