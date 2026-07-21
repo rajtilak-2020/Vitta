@@ -1,0 +1,78 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g., v0.1.0). Leave empty to auto-detect from pubspec.yaml.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nummo-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create GitHub Release and Upload APK
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Determine the tag name
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            # Extract version from pubspec.yaml (e.g., version: 0.1.0+1 -> v0.1.0)
+            VERSION=$(grep 'version:' pubspec.yaml | head -n1 | sed -E 's/version:[[:space:]]*//' | sed -E 's/\+[0-9]+//')
+            TAG_NAME="v$VERSION"
+          fi
+          
+          echo "Creating release for tag: $TAG_NAME"
+          
+          # Rename the APK to include the version name/tag
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          NEW_APK_PATH="build/app/outputs/flutter-apk/Nummo-${TAG_NAME}.apk"
+          cp "$APK_PATH" "$NEW_APK_PATH"
+          
+          # Create the release and upload the renamed APK
+          # --generate-notes automatically creates release notes from commits
+          gh release create "$TAG_NAME" "$NEW_APK_PATH" \
+            --title "Release $TAG_NAME" \
+            --generate-notes
