@@ -85,3 +85,10 @@ Ensure any code modifications compile successfully on both targets:
 - **Android APK**:
   `flutter build apk --release`
   Outputs compile to `build/app/outputs/flutter-apk/app-release.apk`.
+
+---
+
+## 7. Pre-Release Data Safety Audit
+
+Before deploying any feature or version update, AI agents and developers must audit the codebase against the data safety protocol defined in [.agents/PRE_RELEASE_AUDIT.md](file:///c:/Users/K%20Rajtilak/Documents/VScode/Nummo/nummo/.agents/PRE_RELEASE_AUDIT.md) to ensure backward compatibility and zero data loss for existing users.
+
